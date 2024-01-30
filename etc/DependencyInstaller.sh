@@ -63,6 +63,7 @@ _installCommonDev() {
     # tools versions
     osName="linux"
     cmakeChecksum="b8d86f8c5ee990ae03c486c3631cee05"
+    cmakeChecksumAarch64="6a6af752af4b1eae175e1dd0459ec850"
     cmakeVersionBig=3.24
     cmakeVersionSmall=${cmakeVersionBig}.2
     pcreVersion=10.42
@@ -85,21 +86,16 @@ _installCommonDev() {
     # CMake
     cmakePrefix=${PREFIX:-"/usr/local"}
     cmakeBin=${cmakePrefix}/bin/cmake
-    # Check if CMake needs to be installed
+    arch=$(uname -m)
+    if [[ "$arch" == "aarch64" ]]; then
+        cmakeChecksum="${cmakeChecksumAarch64}"
+    fi
     if [[ ! -f ${cmakeBin} || -z $(${cmakeBin} --version | grep ${cmakeVersionBig}) ]]; then
-        # Check if the system architecture is ARM 64-bit
-        if [ "$(uname -m)" == "aarch64" ]; then
-            cd "${baseDir}"
-            wget https://cmake.org/files/v3.21/cmake-3.21.2-${osName}-aarch64.sh
-            chmod +x cmake-3.21.2-${osName}-aarch64.sh
-            ./cmake-3.21.2-${osName}-aarch64.sh --skip-license --prefix=${cmakePrefix}
-        else
-            cd "${baseDir}"
-            wget https://cmake.org/files/v${cmakeVersionBig}/cmake-${cmakeVersionSmall}-${osName}-x86_64.sh
-            md5sum -c <(echo "${cmakeChecksum} cmake-${cmakeVersionSmall}-${osName}-x86_64.sh") || exit 1
-            chmod +x cmake-${cmakeVersionSmall}-${osName}-x86_64.sh
-            ./cmake-${cmakeVersionSmall}-${osName}-x86_64.sh --skip-license --prefix=${cmakePrefix}
-        fi
+        cd "${baseDir}"
+        wget https://cmake.org/files/v${cmakeVersionBig}/cmake-${cmakeVersionSmall}-${osName}-${arch}.sh
+        md5sum -c <(echo "${cmakeChecksum} cmake-${cmakeVersionSmall}-${osName}-${arch}.sh") || exit 1
+        chmod +x cmake-${cmakeVersionSmall}-${osName}-${arch}.sh
+        ./cmake-${cmakeVersionSmall}-${osName}-${arch}.sh --skip-license --prefix=${cmakePrefix}
     else
         echo "CMake already installed."
     fi
