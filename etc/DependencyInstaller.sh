@@ -85,12 +85,21 @@ _installCommonDev() {
     # CMake
     cmakePrefix=${PREFIX:-"/usr/local"}
     cmakeBin=${cmakePrefix}/bin/cmake
+    # Check if CMake needs to be installed
     if [[ ! -f ${cmakeBin} || -z $(${cmakeBin} --version | grep ${cmakeVersionBig}) ]]; then
-        cd "${baseDir}"
-        wget https://cmake.org/files/v${cmakeVersionBig}/cmake-${cmakeVersionSmall}-${osName}-x86_64.sh
-        md5sum -c <(echo "${cmakeChecksum} cmake-${cmakeVersionSmall}-${osName}-x86_64.sh") || exit 1
-        chmod +x cmake-${cmakeVersionSmall}-${osName}-x86_64.sh
-        ./cmake-${cmakeVersionSmall}-${osName}-x86_64.sh --skip-license --prefix=${cmakePrefix}
+        # Check if the system architecture is ARM 64-bit
+        if [ "$(uname -m)" == "aarch64" ]; then
+            cd "${baseDir}"
+            wget https://cmake.org/files/v3.21/cmake-3.21.2-${osName}-aarch64.sh
+            chmod +x cmake-3.21.2-${osName}-aarch64.sh
+            ./cmake-3.21.2-${osName}-aarch64.sh --skip-license --prefix=${cmakePrefix}
+        else
+            cd "${baseDir}"
+            wget https://cmake.org/files/v${cmakeVersionBig}/cmake-${cmakeVersionSmall}-${osName}-x86_64.sh
+            md5sum -c <(echo "${cmakeChecksum} cmake-${cmakeVersionSmall}-${osName}-x86_64.sh") || exit 1
+            chmod +x cmake-${cmakeVersionSmall}-${osName}-x86_64.sh
+            ./cmake-${cmakeVersionSmall}-${osName}-x86_64.sh --skip-license --prefix=${cmakePrefix}
+        fi
     else
         echo "CMake already installed."
     fi
@@ -201,27 +210,41 @@ EOF
     fi
 }
 
+
 _installOrTools() {
     os=$1
     version=$2
     arch=$3
     orToolsVersionBig=9.5
     orToolsVersionSmall=${orToolsVersionBig}.2237
-
     rm -rf "${baseDir}"
     mkdir -p "${baseDir}"
     if [[ ! -z "${PREFIX}" ]]; then mkdir -p "${PREFIX}"; fi
     cd "${baseDir}"
-
-    orToolsFile=or-tools_${arch}_${os}-${version}_cpp_v${orToolsVersionSmall}.tar.gz
-    wget https://github.com/google/or-tools/releases/download/v${orToolsVersionBig}/${orToolsFile}
     orToolsPath=${PREFIX:-"/opt/or-tools"}
-    if command -v brew &> /dev/null; then
-        orToolsPath="$(brew --prefix or-tools)"
+    if [ "$(uname -m)" == "aarch64" ]; then
+        LIST=($(sudo find / -type f -name "libortools.so*" 2>/dev/null))
+        if [ ${#LIST[@]} -eq 0 ]; then
+            echo "OR-TOOLS NOT FOUND"
+            echo "Installing  OR-Tools for aarch64..."
+            git clone https://github.com/google/or-tools.git
+            cd or-tools
+            ${cmakePrefix}/bin/cmake -S. -Bbuild -DBUILD_DEPS:BOOL=ON -DCMAKE_INSTALL_PREFIX=$orToolsPath
+            sudo ${cmakePrefix}/bin/cmake --build build --config Release --target install -v
+        else
+            echo "OR-Tools is already installed"
+        fi
+    else
+        orToolsFile=or-tools_${arch}_${os}-${version}_cpp_v${orToolsVersionSmall}.tar.gz
+        wget https://github.com/google/or-tools/releases/download/v${orToolsVersionBig}/${orToolsFile}
+        orToolsPath=${PREFIX:-"/opt/or-tools"}
+        if command -v brew &> /dev/null; then
+            orToolsPath="$(brew --prefix or-tools)"
+        fi
+        mkdir -p ${orToolsPath}
+        tar --strip 1 --dir ${orToolsPath} -xf ${orToolsFile}
+        rm -rf ${baseDir}
     fi
-    mkdir -p ${orToolsPath}
-    tar --strip 1 --dir ${orToolsPath} -xf ${orToolsFile}
-    rm -rf ${baseDir}
 }
 
 _installUbuntuCleanUp() {
@@ -287,7 +310,9 @@ _installUbuntuPackages() {
     fi
 
     # need the strip "hack" above to run on docker
-    strip --remove-section=.note.ABI-tag /usr/lib/x86_64-linux-gnu/libQt5Core.so
+    arch=$(uname -m)
+    strip --remove-section=.note.ABI-tag "/usr/lib/${arch}-linux-gnu/libQt5Core.so"
+
 }
 
 _installRHELCleanUp() {
