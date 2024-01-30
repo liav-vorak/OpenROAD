@@ -206,17 +206,18 @@ EOF
     fi
 }
 
-
 _installOrTools() {
     os=$1
     version=$2
     arch=$3
     orToolsVersionBig=9.5
     orToolsVersionSmall=${orToolsVersionBig}.2237
+
     rm -rf "${baseDir}"
     mkdir -p "${baseDir}"
     if [[ ! -z "${PREFIX}" ]]; then mkdir -p "${PREFIX}"; fi
     cd "${baseDir}"
+
     orToolsPath=${PREFIX:-"/opt/or-tools"}
     if [ "$(uname -m)" == "aarch64" ]; then
         LIST=($(sudo find / -type f -name "libortools.so*" 2>/dev/null))
